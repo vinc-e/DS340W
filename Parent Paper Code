@@ -1,0 +1,39 @@
+import pandas as pd
+import numpy as np
+import pymc3 as pm
+import theano.tensor as tt
+
+# Load the dataset
+data = pd.read_csv('games_missed_from_injury_2019_2022_complete.csv')
+
+# Filter for head injuries
+data = data[data['injury_area'] == 'head']
+
+# Select relevant columns
+data = data[['surface', 'Avg_Temp', 'num_injuries']]
+
+# Convert surface to categorical variable
+data['surface'] = pd.Categorical(data['surface']).codes
+
+# Define the model
+with pm.Model() as model:
+    # Priors
+    alpha = pm.Normal('alpha', mu=0, sd=10)
+    beta_surface = pm.Normal('beta_surface', mu=0, sd=10)
+    beta_temp = pm.Normal('beta_temp', mu=0, sd=10)
+    theta = pm.Exponential('theta', lam=1)
+    
+    # Linear combination
+    mu = alpha + beta_surface * data['surface'] + beta_temp * data['Avg_Temp']
+    
+    # Negative binomial likelihood
+    likelihood = pm.NegativeBinomial('likelihood', mu=mu, alpha=theta, observed=data['num_injuries'])
+    
+    # Sample
+    trace = pm.sample(2000, tune=1000, cores=1)  # Adjust as needed
+
+# Print summary
+print(pm.summary(trace))
+
+# Plot posterior distributions
+pm.plot_posterior(trace)
